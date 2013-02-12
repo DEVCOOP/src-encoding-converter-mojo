@@ -1,11 +1,14 @@
 package fr.devcoop.mojos.encoding;
 
+import com.google.common.base.Function;
+import com.google.common.collect.Collections2;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.OutputSupplier;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -14,13 +17,14 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import org.apache.commons.io.DirectoryWalker;
+import org.apache.maven.model.Resource;
+import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.project.MavenProject;
 
 /**
  * Goal which convert all sources and resources from an encoding to another one.
- *
- *
  */
 @Mojo(name = "convert")
 public class ConvertMojo extends AbstractMojo {
@@ -34,18 +38,32 @@ public class ConvertMojo extends AbstractMojo {
     @Parameter(defaultValue = "${project.testSourceRoots}")
     private List<String> testSourceRoots;
     @Parameter(defaultValue = "${project.resources}")
-    private List<String> resources;
-    @Parameter(defaultValue = "project.testResources")
-    private List<String> testResources;
+    private List<Resource> resources;
+    @Parameter(defaultValue = "${project.testResources}")
+    private List<Resource> testResources;
+    @Component
+    private MavenProject project;
 
     @Override
     public void execute() throws MojoExecutionException {
         try {
-            List<String> roots = new ArrayList(resources);
+            getLog().info(String.format("Convert sources and resources from %s to %s", sourceEncoding, targetEncoding));
+            List<String> roots = new ArrayList();
             roots.addAll(sourceRoots);
             roots.addAll(testSourceRoots);
-            roots.addAll(testResources);
-            for (String sourceDirectory : sourceRoots) {
+            roots.addAll(Collections2.transform(resources, new Function<Resource, String>() {
+                public String apply(Resource input) {
+                    return input.getDirectory();
+                }
+            }));
+            roots.addAll(Collections2.transform(testResources, new Function<Resource, String>() {
+                public String apply(Resource input) {
+                    return input.getDirectory();
+                }
+            }));
+        
+            for (String sourceDirectory : roots) {
+                getLog().info(String.format("Converting %s", sourceDirectory));
                 MyDirectoryWalker walker = new MyDirectoryWalker();
                 walker.walk(new File(sourceDirectory));
             }
@@ -55,6 +73,23 @@ public class ConvertMojo extends AbstractMojo {
     }
 
     private class MyDirectoryWalker extends DirectoryWalker {
+
+        public MyDirectoryWalker() {
+            super(new FileFilter() {
+                public boolean accept(File pathname) {
+                    try {
+                        getLog().debug(pathname.getCanonicalPath());
+                        return pathname.isDirectory() || pathname.getCanonicalPath().endsWith(".java")
+                                || pathname.getCanonicalPath().endsWith(".properties")
+                                || pathname.getCanonicalPath().endsWith(".html")
+                                || pathname.getCanonicalPath().endsWith(".xhtml")
+                                || pathname.getCanonicalPath().endsWith(".jsp");
+                    } catch (IOException ex) {
+                        return false;
+                    }
+                }
+            }, -1);
+        }
 
         @Override
         protected void handleFile(final File file, int depth, Collection results) throws IOException {
@@ -72,4 +107,5 @@ public class ConvertMojo extends AbstractMojo {
             super.walk(file, new ArrayList());
         }
     }
+
 }
