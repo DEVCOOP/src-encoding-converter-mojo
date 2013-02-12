@@ -14,47 +14,28 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import org.apache.commons.io.DirectoryWalker;
+import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
 
 /**
  * Goal which convert all sources and resources from an encoding to another one.
  *
- * @goal convert
  *
- * @phase process-sources
  */
+@Mojo(name = "convert")
 public class ConvertMojo extends AbstractMojo {
 
-    /**
-     * @parameter @required @readonly
-     */
+    @Parameter(defaultValue = "${sourceEncoding}")
     private String sourceEncoding;
-    /**
-     * @parameter @required @readonly
-     */
+    @Parameter(defaultValue = "${targetEncoding}")
     private String targetEncoding;
-    /**
-     * @parameter default-value="${project.compileSourceRoots}"
-     * @required
-     * @readonly
-     */
+    @Parameter(defaultValue = "${project.compileSourceRoots}")
     private List<String> sourceRoots;
-    /**
-     * @parameter default-value="${project.testSourceRoots}"
-     * @required
-     * @readonly
-     */
+    @Parameter(defaultValue = "${project.testSourceRoots}")
     private List<String> testSourceRoots;
-    /**
-     * @parameter default-value="${project.resources}"
-     * @required
-     * @readonly
-     */
+    @Parameter(defaultValue = "${project.resources}")
     private List<String> resources;
-    /**
-     * @parameter default-value="${project.resources}"
-     * @required
-     * @readonly
-     */
+    @Parameter(defaultValue = "project.testResources")
     private List<String> testResources;
 
     @Override
