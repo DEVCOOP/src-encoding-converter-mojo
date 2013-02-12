@@ -8,5 +8,5 @@ I share this little mojo.
 
 Example of usage :
 
-  mvn fr.devcoop.mojos:src-encoding-converter:1.0-SNAPSHOT:convert -DsourceEncoding=ISO-8859-1 -DtargetEncoding=UTF-8
+    mvn fr.devcoop.mojos:src-encoding-converter:1.0-SNAPSHOT:convert -DsourceEncoding=ISO-8859-1 -DtargetEncoding=UTF-8
 
