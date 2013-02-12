@@ -15,13 +15,16 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import org.apache.commons.io.DirectoryWalker;
+import org.apache.maven.model.Plugin;
 import org.apache.maven.model.Resource;
 import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
+import org.codehaus.plexus.util.xml.Xpp3Dom;
 
 /**
  * Goal which convert all sources and resources from an encoding to another one.
@@ -62,6 +65,10 @@ public class ConvertMojo extends AbstractMojo {
                 }
             }));
         
+            for (ExtraSupportedPackaging supportedPackaging : ExtraSupportedPackaging.values()) {
+                roots.addAll(supportedPackaging.getSrcDirExtractor().apply(project));
+            }
+            
             for (String sourceDirectory : roots) {
                 getLog().info(String.format("Converting %s", sourceDirectory));
                 MyDirectoryWalker walker = new MyDirectoryWalker();
@@ -79,6 +86,7 @@ public class ConvertMojo extends AbstractMojo {
                 public boolean accept(File pathname) {
                     try {
                         getLog().debug(pathname.getCanonicalPath());
+                        // TODO : remove this ugly filtering
                         return pathname.isDirectory() || pathname.getCanonicalPath().endsWith(".java")
                                 || pathname.getCanonicalPath().endsWith(".properties")
                                 || pathname.getCanonicalPath().endsWith(".html")
@@ -108,4 +116,46 @@ public class ConvertMojo extends AbstractMojo {
         }
     }
 
+
+ private enum ExtraSupportedPackaging {
+
+        WAR("war", SrcWebappDirExtractor.INSTANCE);
+        private String name;
+        private Function<MavenProject, List<String>> srcDirExtractor;
+
+        private ExtraSupportedPackaging(String name, Function<MavenProject, List<String>> srcDirExtractor) {
+            this.name = name;
+            this.srcDirExtractor = srcDirExtractor;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public Function<MavenProject, List<String>> getSrcDirExtractor() {
+            return srcDirExtractor;
+        }
+    }
+
+    private enum SrcWebappDirExtractor implements Function<MavenProject, List<String>> {
+
+        INSTANCE;
+
+        public List<String> apply(MavenProject input) {
+            if (!"war".equals(input.getPackaging())) {
+                return Collections.emptyList();
+            }
+            Plugin warPlugin = input.getPlugin("org.apache.maven.plugins:maven-war-plugin");
+
+            File warSources = new File(input.getBasedir(), "/src/main/webapp");
+            if (warPlugin.getConfiguration() != null) {
+                Xpp3Dom dom = (Xpp3Dom) warPlugin.getConfiguration();
+                Xpp3Dom warSourceDirectory = dom.getChild("warSourceDirectory");
+                if (warSourceDirectory != null) {
+                    warSources = new File(input.getBasedir(), warSourceDirectory.getValue());
+                }
+            }
+            return Collections.singletonList(warSources.toString());
+        }
+    }
 }
