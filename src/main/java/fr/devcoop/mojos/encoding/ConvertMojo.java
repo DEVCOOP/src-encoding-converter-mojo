@@ -16,7 +16,9 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.apache.commons.io.DirectoryWalker;
 import org.apache.maven.model.Plugin;
 import org.apache.maven.model.Resource;
@@ -38,8 +40,8 @@ public class ConvertMojo extends AbstractMojo {
     private String targetEncoding;
     @Parameter(defaultValue = "${project.compileSourceRoots}")
     private List<String> sourceRoots;
-    @Parameter(defaultValue = "${project.testSourceRoots}")
-    private List<String> testSourceRoots;
+    @Parameter(defaultValue = "${project.testCompileSourceRoots}")
+    private List<String> testCompileSourceRoots;
     @Parameter(defaultValue = "${project.resources}")
     private List<Resource> resources;
     @Parameter(defaultValue = "${project.testResources}")
@@ -53,7 +55,11 @@ public class ConvertMojo extends AbstractMojo {
             getLog().info(String.format("Convert sources and resources from %s to %s", sourceEncoding, targetEncoding));
             List<String> roots = new ArrayList();
             roots.addAll(sourceRoots);
-            roots.addAll(testSourceRoots);
+            roots.addAll(testCompileSourceRoots);
+            
+//            roots.add(new File(project.getBasedir(), "src/main/resources").toString());
+//            roots.add(new File(project.getBasedir(), "src/test/resources").toString());
+
             roots.addAll(Collections2.transform(resources, new Function<Resource, String>() {
                 public String apply(Resource input) {
                     return input.getDirectory();
@@ -64,11 +70,11 @@ public class ConvertMojo extends AbstractMojo {
                     return input.getDirectory();
                 }
             }));
-        
+
             for (ExtraSupportedPackaging supportedPackaging : ExtraSupportedPackaging.values()) {
                 roots.addAll(supportedPackaging.getSrcDirExtractor().apply(project));
             }
-            
+
             for (String sourceDirectory : roots) {
                 getLog().info(String.format("Converting %s", sourceDirectory));
                 MyDirectoryWalker walker = new MyDirectoryWalker();
@@ -81,26 +87,17 @@ public class ConvertMojo extends AbstractMojo {
 
     private class MyDirectoryWalker extends DirectoryWalker {
 
+//        private static Set<String> treatedPathCache = new HashSet<String>();
         public MyDirectoryWalker() {
-            super(new FileFilter() {
-                public boolean accept(File pathname) {
-                    try {
-                        getLog().debug(pathname.getCanonicalPath());
-                        // TODO : remove this ugly filtering
-                        return pathname.isDirectory() || pathname.getCanonicalPath().endsWith(".java")
-                                || pathname.getCanonicalPath().endsWith(".properties")
-                                || pathname.getCanonicalPath().endsWith(".html")
-                                || pathname.getCanonicalPath().endsWith(".xhtml")
-                                || pathname.getCanonicalPath().endsWith(".jsp");
-                    } catch (IOException ex) {
-                        return false;
-                    }
-                }
-            }, -1);
+            super(new MyFileFilter(), -1);
         }
 
         @Override
         protected void handleFile(final File file, int depth, Collection results) throws IOException {
+//            if (isInTreatedCache(file)) {
+//                return;
+//            }
+
             byte[] content = new byte[(int) file.length()];
             ByteStreams.readFully(new FileInputStream(file), content);
             String srcContent = new String(content, sourceEncoding);
@@ -111,13 +108,36 @@ public class ConvertMojo extends AbstractMojo {
             });
         }
 
+//        private boolean isInTreatedCache(File pathname) throws IOException {
+//            if (treatedPathCache.contains(pathname.getCanonicalPath())) {
+//                getLog().info(String.format("Already treated %s", pathname.getCanonicalPath()));
+//                return true;
+//            }
+//            treatedPathCache.add(pathname.getCanonicalPath());
+//            return false;
+//        }
         public void walk(File file) throws IOException {
             super.walk(file, new ArrayList());
         }
     }
 
+    private class MyFileFilter implements FileFilter {
 
- private enum ExtraSupportedPackaging {
+        public boolean accept(File pathname) {
+            try {
+                // TODO : remove this ugly filtering
+                return pathname.isDirectory() || pathname.getCanonicalPath().endsWith(".java")
+                        || pathname.getCanonicalPath().endsWith(".properties")
+                        || pathname.getCanonicalPath().endsWith(".html")
+                        || pathname.getCanonicalPath().endsWith(".xhtml")
+                        || pathname.getCanonicalPath().endsWith(".jsp");
+            } catch (IOException ex) {
+                return false;
+            }
+        }
+    }
+
+    private enum ExtraSupportedPackaging {
 
         WAR("war", SrcWebappDirExtractor.INSTANCE);
         private String name;
